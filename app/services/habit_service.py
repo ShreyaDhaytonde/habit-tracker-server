@@ -25,16 +25,24 @@ def compute_streak(completed_days: list[date], today: date) -> int:
     return streak
 
 
-def create_habit(db: Session, name: str) -> Habit:
-    habit = Habit(name=name)
+def create_habit(db: Session, name: str, category: str = "General") -> Habit:
+    habit = Habit(name=name, category=category)
     db.add(habit)
     db.commit()
     db.refresh(habit)
     return habit
 
 
-def list_habits(db: Session) -> list[Habit]:
-    return db.query(Habit).order_by(Habit.id).all()
+def list_habits(db: Session, category: str | None = None) -> list[Habit]:
+    query = db.query(Habit)
+    if category:
+        query = query.filter(Habit.category == category)
+    return query.order_by(Habit.id).all()
+
+
+def list_categories(db: Session) -> list[str]:
+    rows = db.query(Habit.category).distinct().order_by(Habit.category).all()
+    return [row[0] for row in rows]
 
 
 def get_habit(db: Session, habit_id: int) -> Habit | None:
@@ -59,6 +67,7 @@ def to_summary(habit: Habit, today: date) -> dict:
     return {
         "id": habit.id,
         "name": habit.name,
+        "category": habit.category,
         "streak": compute_streak(completed_days, today),
         "completed_today": today in completed_days,
         "completed_days": sorted(completed_days),

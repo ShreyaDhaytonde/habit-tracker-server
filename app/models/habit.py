@@ -11,6 +11,7 @@ class Habit(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(50), default="General", server_default="General")
 
     completions: Mapped[list["Completion"]] = relationship(
         back_populates="habit", cascade="all, delete-orphan", order_by="Completion.day"

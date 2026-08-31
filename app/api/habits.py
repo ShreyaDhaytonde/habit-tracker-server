@@ -11,14 +11,20 @@ router = APIRouter(prefix="/habits", tags=["habits"])
 
 
 @router.get("", response_model=list[HabitOut])
-def list_habits(db: Session = Depends(get_db)):
+def list_habits(category: str | None = None, db: Session = Depends(get_db)):
     today = date.today()
-    return [habit_service.to_summary(h, today) for h in habit_service.list_habits(db)]
+    habits = habit_service.list_habits(db, category=category)
+    return [habit_service.to_summary(h, today) for h in habits]
+
+
+@router.get("/categories", response_model=list[str])
+def list_categories(db: Session = Depends(get_db)):
+    return habit_service.list_categories(db)
 
 
 @router.post("", response_model=HabitOut, status_code=201)
 def create_habit(payload: HabitCreate, db: Session = Depends(get_db)):
-    habit = habit_service.create_habit(db, payload.name)
+    habit = habit_service.create_habit(db, payload.name, payload.category)
     return habit_service.to_summary(habit, date.today())
 
 

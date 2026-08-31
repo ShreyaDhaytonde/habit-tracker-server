@@ -15,13 +15,25 @@ def test_create_habit(client):
     assert resp.status_code == 201
     body = resp.json()
     assert body["name"] == "Drink water"
+    assert body["category"] == "General"
     assert body["streak"] == 0
     assert body["completed_today"] is False
     assert body["completed_days"] == []
 
 
+def test_create_habit_with_explicit_category(client):
+    resp = client.post("/habits", json={"name": "Run 5k", "category": "Health"})
+    assert resp.status_code == 201
+    assert resp.json()["category"] == "Health"
+
+
 def test_create_habit_rejects_empty_name(client):
     resp = client.post("/habits", json={"name": ""})
+    assert resp.status_code == 422
+
+
+def test_create_habit_rejects_empty_category(client):
+    resp = client.post("/habits", json={"name": "Read", "category": ""})
     assert resp.status_code == 422
 
 
@@ -67,3 +79,30 @@ def test_delete_habit(client):
 def test_delete_unknown_habit_404s(client):
     resp = client.delete("/habits/999")
     assert resp.status_code == 404
+
+
+def test_list_habits_filters_by_category(client):
+    client.post("/habits", json={"name": "Run 5k", "category": "Health"})
+    client.post("/habits", json={"name": "Read", "category": "Learning"})
+
+    resp = client.get("/habits", params={"category": "Health"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    assert body[0]["name"] == "Run 5k"
+
+
+def test_list_categories_returns_distinct_sorted_categories(client):
+    client.post("/habits", json={"name": "Run 5k", "category": "Health"})
+    client.post("/habits", json={"name": "Stretch", "category": "Health"})
+    client.post("/habits", json={"name": "Read", "category": "Learning"})
+
+    resp = client.get("/habits/categories")
+    assert resp.status_code == 200
+    assert resp.json() == ["Health", "Learning"]
+
+
+def test_list_categories_empty_when_no_habits(client):
+    resp = client.get("/habits/categories")
+    assert resp.status_code == 200
+    assert resp.json() == []

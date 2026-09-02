@@ -16,9 +16,28 @@ def test_create_habit(client):
     body = resp.json()
     assert body["name"] == "Drink water"
     assert body["category"] == "General"
+    assert body["target_per_week"] == 7
+    assert body["completed_this_week"] == 0
     assert body["streak"] == 0
     assert body["completed_today"] is False
     assert body["completed_days"] == []
+
+
+def test_create_habit_with_explicit_target_per_week(client):
+    resp = client.post("/habits", json={"name": "Run", "target_per_week": 3})
+    assert resp.status_code == 201
+    assert resp.json()["target_per_week"] == 3
+
+
+def test_create_habit_rejects_target_per_week_out_of_range(client):
+    assert client.post("/habits", json={"name": "Run", "target_per_week": 0}).status_code == 422
+    assert client.post("/habits", json={"name": "Run", "target_per_week": 8}).status_code == 422
+
+
+def test_complete_habit_updates_completed_this_week(client):
+    created = client.post("/habits", json={"name": "Run", "target_per_week": 3}).json()
+    resp = client.post(f"/habits/{created['id']}/complete")
+    assert resp.json()["completed_this_week"] == 1
 
 
 def test_create_habit_with_explicit_category(client):

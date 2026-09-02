@@ -24,7 +24,9 @@ def list_categories(db: Session = Depends(get_db)):
 
 @router.post("", response_model=HabitOut, status_code=201)
 def create_habit(payload: HabitCreate, db: Session = Depends(get_db)):
-    habit = habit_service.create_habit(db, payload.name, payload.category)
+    habit = habit_service.create_habit(
+        db, payload.name, payload.category, payload.target_per_week
+    )
     return habit_service.to_summary(habit, date.today())
 
 

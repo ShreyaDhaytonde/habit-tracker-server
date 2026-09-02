@@ -25,8 +25,20 @@ def compute_streak(completed_days: list[date], today: date) -> int:
     return streak
 
 
-def create_habit(db: Session, name: str, category: str = "General") -> Habit:
-    habit = Habit(name=name, category=category)
+def start_of_week(day: date) -> date:
+    """Monday of the week containing `day`."""
+    return day - timedelta(days=day.weekday())
+
+
+def count_completions_in_week(completed_days: list[date], today: date) -> int:
+    week_start = start_of_week(today)
+    return sum(1 for day in completed_days if week_start <= day <= today)
+
+
+def create_habit(
+    db: Session, name: str, category: str = "General", target_per_week: int = 7
+) -> Habit:
+    habit = Habit(name=name, category=category, target_per_week=target_per_week)
     db.add(habit)
     db.commit()
     db.refresh(habit)
@@ -68,6 +80,8 @@ def to_summary(habit: Habit, today: date) -> dict:
         "id": habit.id,
         "name": habit.name,
         "category": habit.category,
+        "target_per_week": habit.target_per_week,
+        "completed_this_week": count_completions_in_week(completed_days, today),
         "streak": compute_streak(completed_days, today),
         "completed_today": today in completed_days,
         "completed_days": sorted(completed_days),

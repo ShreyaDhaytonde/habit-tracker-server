@@ -74,6 +74,31 @@ def delete_habit(db: Session, habit: Habit) -> None:
     db.commit()
 
 
+def get_stats(db: Session, today: date) -> dict:
+    summaries = [to_summary(habit, today) for habit in list_habits(db)]
+
+    weekly_target_total = sum(s["target_per_week"] for s in summaries)
+    weekly_completed_total = sum(s["completed_this_week"] for s in summaries)
+
+    by_category: dict[str, int] = {}
+    for summary in summaries:
+        by_category[summary["category"]] = by_category.get(summary["category"], 0) + 1
+
+    return {
+        "total_habits": len(summaries),
+        "completed_today": sum(1 for s in summaries if s["completed_today"]),
+        "active_streaks": sum(1 for s in summaries if s["streak"] > 0),
+        "best_streak": max((s["streak"] for s in summaries), default=0),
+        "total_completions": sum(len(s["completed_days"]) for s in summaries),
+        "weekly_completion_rate": (
+            round(weekly_completed_total / weekly_target_total * 100)
+            if weekly_target_total
+            else 0
+        ),
+        "by_category": by_category,
+    }
+
+
 def to_summary(habit: Habit, today: date) -> dict:
     completed_days = [c.day for c in habit.completions]
     return {

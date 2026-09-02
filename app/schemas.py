@@ -9,6 +9,16 @@ class HabitCreate(BaseModel):
     target_per_week: int = Field(default=7, ge=1, le=7)
 
 
+class HabitStats(BaseModel):
+    total_habits: int
+    completed_today: int
+    active_streaks: int
+    best_streak: int
+    total_completions: int
+    weekly_completion_rate: int
+    by_category: dict[str, int]
+
+
 class HabitOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import HabitCreate, HabitOut
+from app.schemas import HabitCreate, HabitOut, HabitStats
 from app.services import habit_service
 
 router = APIRouter(prefix="/habits", tags=["habits"])
@@ -20,6 +20,11 @@ def list_habits(category: str | None = None, db: Session = Depends(get_db)):
 @router.get("/categories", response_model=list[str])
 def list_categories(db: Session = Depends(get_db)):
     return habit_service.list_categories(db)
+
+
+@router.get("/stats", response_model=HabitStats)
+def get_stats(db: Session = Depends(get_db)):
+    return habit_service.get_stats(db, date.today())
 
 
 @router.post("", response_model=HabitOut, status_code=201)

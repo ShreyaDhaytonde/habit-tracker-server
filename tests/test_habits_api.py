@@ -125,3 +125,51 @@ def test_list_categories_empty_when_no_habits(client):
     resp = client.get("/habits/categories")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+def test_stats_empty_when_no_habits(client):
+    resp = client.get("/habits/stats")
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "total_habits": 0,
+        "completed_today": 0,
+        "active_streaks": 0,
+        "best_streak": 0,
+        "total_completions": 0,
+        "weekly_completion_rate": 0,
+        "by_category": {},
+    }
+
+
+def test_stats_counts_habits_and_categories(client):
+    client.post("/habits", json={"name": "Run 5k", "category": "Health"})
+    client.post("/habits", json={"name": "Stretch", "category": "Health"})
+    client.post("/habits", json={"name": "Read", "category": "Learning"})
+
+    body = client.get("/habits/stats").json()
+
+    assert body["total_habits"] == 3
+    assert body["by_category"] == {"Health": 2, "Learning": 1}
+
+
+def test_stats_reflects_completions_and_streaks(client):
+    created = client.post("/habits", json={"name": "Run", "target_per_week": 2}).json()
+    client.post(f"/habits/{created['id']}/complete")
+
+    body = client.get("/habits/stats").json()
+
+    assert body["completed_today"] == 1
+    assert body["active_streaks"] == 1
+    assert body["best_streak"] == 1
+    assert body["total_completions"] == 1
+
+
+def test_stats_weekly_completion_rate_is_a_percentage_of_targets(client):
+    first = client.post("/habits", json={"name": "Run", "target_per_week": 2}).json()
+    client.post("/habits", json={"name": "Read", "target_per_week": 2})
+    client.post(f"/habits/{first['id']}/complete")
+
+    body = client.get("/habits/stats").json()
+
+    # 1 completion this week against a combined weekly target of 4.
+    assert body["weekly_completion_rate"] == 25

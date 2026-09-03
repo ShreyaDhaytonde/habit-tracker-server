@@ -9,6 +9,12 @@ class HabitCreate(BaseModel):
     target_per_week: int = Field(default=7, ge=1, le=7)
 
 
+class HabitUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    category: str | None = Field(default=None, min_length=1, max_length=50)
+    target_per_week: int | None = Field(default=None, ge=1, le=7)
+
+
 class HabitStats(BaseModel):
     total_habits: int
     completed_today: int

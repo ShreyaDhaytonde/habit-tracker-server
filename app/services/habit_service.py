@@ -69,6 +69,24 @@ def complete_habit(db: Session, habit: Habit, today: date) -> Habit:
     return habit
 
 
+def update_habit(
+    db: Session,
+    habit: Habit,
+    name: str | None = None,
+    category: str | None = None,
+    target_per_week: int | None = None,
+) -> Habit:
+    if name is not None:
+        habit.name = name
+    if category is not None:
+        habit.category = category
+    if target_per_week is not None:
+        habit.target_per_week = target_per_week
+    db.commit()
+    db.refresh(habit)
+    return habit
+
+
 def delete_habit(db: Session, habit: Habit) -> None:
     db.delete(habit)
     db.commit()

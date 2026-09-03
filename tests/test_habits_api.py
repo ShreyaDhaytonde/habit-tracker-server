@@ -173,3 +173,58 @@ def test_stats_weekly_completion_rate_is_a_percentage_of_targets(client):
 
     # 1 completion this week against a combined weekly target of 4.
     assert body["weekly_completion_rate"] == 25
+
+
+def test_update_habit_renames(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    resp = client.patch(f"/habits/{created['id']}", json={"name": "Run 5k"})
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "Run 5k"
+
+
+def test_update_habit_changes_category_and_target(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    resp = client.patch(
+        f"/habits/{created['id']}", json={"category": "Health", "target_per_week": 4}
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["category"] == "Health"
+    assert body["target_per_week"] == 4
+
+
+def test_update_habit_partial_leaves_other_fields_unchanged(client):
+    created = client.post(
+        "/habits", json={"name": "Run", "category": "Health", "target_per_week": 5}
+    ).json()
+    resp = client.patch(f"/habits/{created['id']}", json={"name": "Run fast"})
+    body = resp.json()
+    assert body["name"] == "Run fast"
+    assert body["category"] == "Health"
+    assert body["target_per_week"] == 5
+
+
+def test_update_habit_preserves_completions_and_streak(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    client.post(f"/habits/{created['id']}/complete")
+    resp = client.patch(f"/habits/{created['id']}", json={"name": "Run fast"})
+    body = resp.json()
+    assert body["completed_today"] is True
+    assert body["streak"] == 1
+
+
+def test_update_habit_404_when_missing(client):
+    resp = client.patch("/habits/999", json={"name": "Whatever"})
+    assert resp.status_code == 404
+
+
+def test_update_habit_rejects_empty_name(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    resp = client.patch(f"/habits/{created['id']}", json={"name": ""})
+    assert resp.status_code == 422
+
+
+def test_update_habit_rejects_target_per_week_out_of_range(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    resp = client.patch(f"/habits/{created['id']}", json={"target_per_week": 8})
+    assert resp.status_code == 422

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import HabitCreate, HabitOut, HabitStats
+from app.schemas import HabitCreate, HabitOut, HabitStats, HabitUpdate
 from app.services import habit_service
 
 router = APIRouter(prefix="/habits", tags=["habits"])
@@ -43,6 +43,17 @@ def complete_habit(habit_id: int, db: Session = Depends(get_db)):
     today = date.today()
     habit_service.complete_habit(db, habit, today)
     return habit_service.to_summary(habit, today)
+
+
+@router.patch("/{habit_id}", response_model=HabitOut)
+def update_habit(habit_id: int, payload: HabitUpdate, db: Session = Depends(get_db)):
+    habit = habit_service.get_habit(db, habit_id)
+    if habit is None:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    habit_service.update_habit(
+        db, habit, payload.name, payload.category, payload.target_per_week
+    )
+    return habit_service.to_summary(habit, date.today())
 
 
 @router.delete("/{habit_id}", status_code=204)

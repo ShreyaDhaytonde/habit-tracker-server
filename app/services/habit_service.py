@@ -36,19 +36,27 @@ def count_completions_in_week(completed_days: list[date], today: date) -> int:
 
 
 def create_habit(
-    db: Session, name: str, category: str = "General", target_per_week: int = 7
+    db: Session,
+    name: str,
+    category: str = "General",
+    target_per_week: int = 7,
+    notes: str | None = None,
 ) -> Habit:
-    habit = Habit(name=name, category=category, target_per_week=target_per_week)
+    habit = Habit(name=name, category=category, target_per_week=target_per_week, notes=notes)
     db.add(habit)
     db.commit()
     db.refresh(habit)
     return habit
 
 
-def list_habits(db: Session, category: str | None = None) -> list[Habit]:
+def list_habits(
+    db: Session, category: str | None = None, include_archived: bool = False
+) -> list[Habit]:
     query = db.query(Habit)
     if category:
         query = query.filter(Habit.category == category)
+    if not include_archived:
+        query = query.filter(Habit.archived.is_(False))
     return query.order_by(Habit.id).all()
 
 
@@ -75,6 +83,8 @@ def update_habit(
     name: str | None = None,
     category: str | None = None,
     target_per_week: int | None = None,
+    notes: str | None = None,
+    archived: bool | None = None,
 ) -> Habit:
     if name is not None:
         habit.name = name
@@ -82,6 +92,10 @@ def update_habit(
         habit.category = category
     if target_per_week is not None:
         habit.target_per_week = target_per_week
+    if notes is not None:
+        habit.notes = notes
+    if archived is not None:
+        habit.archived = archived
     db.commit()
     db.refresh(habit)
     return habit
@@ -124,6 +138,8 @@ def to_summary(habit: Habit, today: date) -> dict:
         "name": habit.name,
         "category": habit.category,
         "target_per_week": habit.target_per_week,
+        "notes": habit.notes,
+        "archived": habit.archived,
         "completed_this_week": count_completions_in_week(completed_days, today),
         "streak": compute_streak(completed_days, today),
         "completed_today": today in completed_days,

@@ -11,9 +11,13 @@ router = APIRouter(prefix="/habits", tags=["habits"])
 
 
 @router.get("", response_model=list[HabitOut])
-def list_habits(category: str | None = None, db: Session = Depends(get_db)):
+def list_habits(
+    category: str | None = None,
+    include_archived: bool = False,
+    db: Session = Depends(get_db),
+):
     today = date.today()
-    habits = habit_service.list_habits(db, category=category)
+    habits = habit_service.list_habits(db, category=category, include_archived=include_archived)
     return [habit_service.to_summary(h, today) for h in habits]
 
 
@@ -30,7 +34,7 @@ def get_stats(db: Session = Depends(get_db)):
 @router.post("", response_model=HabitOut, status_code=201)
 def create_habit(payload: HabitCreate, db: Session = Depends(get_db)):
     habit = habit_service.create_habit(
-        db, payload.name, payload.category, payload.target_per_week
+        db, payload.name, payload.category, payload.target_per_week, payload.notes
     )
     return habit_service.to_summary(habit, date.today())
 
@@ -51,7 +55,13 @@ def update_habit(habit_id: int, payload: HabitUpdate, db: Session = Depends(get_
     if habit is None:
         raise HTTPException(status_code=404, detail="Habit not found")
     habit_service.update_habit(
-        db, habit, payload.name, payload.category, payload.target_per_week
+        db,
+        habit,
+        payload.name,
+        payload.category,
+        payload.target_per_week,
+        payload.notes,
+        payload.archived,
     )
     return habit_service.to_summary(habit, date.today())
 

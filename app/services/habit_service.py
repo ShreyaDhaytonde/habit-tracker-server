@@ -131,8 +131,29 @@ def get_stats(db: Session, today: date) -> dict:
     }
 
 
+def is_at_risk(
+    target_per_week: int, completed_this_week: int, completed_today: bool, today: date
+) -> bool:
+    """True if hitting the weekly target now requires completing every
+    remaining day of the week, including today.
+
+    Not just "behind" -- there is still enough of the week left to recover
+    unless every remaining day counts. Never at risk once today is already
+    done, since today's own opportunity is spent either way.
+    """
+    if completed_today:
+        return False
+    remaining_needed = target_per_week - completed_this_week
+    if remaining_needed <= 0:
+        return False
+    days_left_in_week = 7 - today.weekday()
+    return remaining_needed >= days_left_in_week
+
+
 def to_summary(habit: Habit, today: date) -> dict:
     completed_days = [c.day for c in habit.completions]
+    completed_this_week = count_completions_in_week(completed_days, today)
+    completed_today = today in completed_days
     return {
         "id": habit.id,
         "name": habit.name,
@@ -140,8 +161,9 @@ def to_summary(habit: Habit, today: date) -> dict:
         "target_per_week": habit.target_per_week,
         "notes": habit.notes,
         "archived": habit.archived,
-        "completed_this_week": count_completions_in_week(completed_days, today),
+        "completed_this_week": completed_this_week,
         "streak": compute_streak(completed_days, today),
-        "completed_today": today in completed_days,
+        "completed_today": completed_today,
         "completed_days": sorted(completed_days),
+        "at_risk": is_at_risk(habit.target_per_week, completed_this_week, completed_today, today),
     }

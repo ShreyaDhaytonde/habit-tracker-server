@@ -41,3 +41,4 @@ class HabitOut(BaseModel):
     streak: int
     completed_today: bool
     completed_days: list[date]
+    at_risk: bool

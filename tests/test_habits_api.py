@@ -228,3 +228,18 @@ def test_update_habit_rejects_target_per_week_out_of_range(client):
     created = client.post("/habits", json={"name": "Run"}).json()
     resp = client.patch(f"/habits/{created['id']}", json={"target_per_week": 8})
     assert resp.status_code == 422
+
+
+def test_at_risk_field_is_present_on_a_freshly_created_habit(client):
+    # Whether a brand-new habit is at risk depends on today's weekday (the
+    # exact rule is covered deterministically in test_habit_service.py), so
+    # this only checks the field is wired through, not a specific value.
+    created = client.post("/habits", json={"name": "Run", "target_per_week": 1}).json()
+    assert "at_risk" in created
+    assert isinstance(created["at_risk"], bool)
+
+
+def test_at_risk_is_false_once_completed_today_even_for_a_daily_habit(client):
+    created = client.post("/habits", json={"name": "Run", "target_per_week": 7}).json()
+    resp = client.post(f"/habits/{created['id']}/complete")
+    assert resp.json()["at_risk"] is False

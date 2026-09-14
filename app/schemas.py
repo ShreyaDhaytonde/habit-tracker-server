@@ -21,6 +21,7 @@ class HabitUpdate(BaseModel):
 class HabitStats(BaseModel):
     total_habits: int
     completed_today: int
+    skipped_today: int
     active_streaks: int
     best_streak: int
     total_completions: int
@@ -41,4 +42,6 @@ class HabitOut(BaseModel):
     streak: int
     completed_today: bool
     completed_days: list[date]
+    skipped_today: bool
+    skipped_days: list[date]
     at_risk: bool

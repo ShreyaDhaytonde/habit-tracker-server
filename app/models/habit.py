@@ -19,6 +19,9 @@ class Habit(Base):
     completions: Mapped[list["Completion"]] = relationship(
         back_populates="habit", cascade="all, delete-orphan", order_by="Completion.day"
     )
+    skips: Mapped[list["Skip"]] = relationship(
+        back_populates="habit", cascade="all, delete-orphan", order_by="Skip.day"
+    )
 
 
 class Completion(Base):
@@ -30,3 +33,20 @@ class Completion(Base):
     day: Mapped[date] = mapped_column(Date)
 
     habit: Mapped["Habit"] = relationship(back_populates="completions")
+
+
+class Skip(Base):
+    """A rest/freeze day: preserves the streak without counting as a
+    completion. Stored separately from Completion (rather than a flag on
+    it) so a day is unambiguously completed, skipped, or neither, and so
+    this ships without any migration -- a new table is picked up by the
+    existing `Base.metadata.create_all`."""
+
+    __tablename__ = "skips"
+    __table_args__ = (UniqueConstraint("habit_id", "day", name="uq_habit_skip_day"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    habit_id: Mapped[int] = mapped_column(ForeignKey("habits.id"))
+    day: Mapped[date] = mapped_column(Date)
+
+    habit: Mapped["Habit"] = relationship(back_populates="skips")

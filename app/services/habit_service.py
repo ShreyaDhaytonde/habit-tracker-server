@@ -2,25 +2,31 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models.habit import Completion, Habit
+from app.models.habit import Completion, Habit, Skip
 
 
-def compute_streak(completed_days: list[date], today: date) -> int:
-    """Consecutive days ending today or yesterday. A gap of 2+ days breaks it."""
+def compute_streak(
+    completed_days: list[date], today: date, skipped_days: list[date] | None = None
+) -> int:
+    """Consecutive days ending today or yesterday. A gap of 2+ uncovered
+    days breaks it. A skipped (frozen/rest) day neither adds to the streak
+    nor breaks it -- the count just pauses across it."""
     days = set(completed_days)
+    skipped = set(skipped_days or ())
     if not days:
         return 0
 
-    if today in days:
+    if today in days or today in skipped:
         cursor = today
-    elif today - timedelta(days=1) in days:
+    elif today - timedelta(days=1) in days or today - timedelta(days=1) in skipped:
         cursor = today - timedelta(days=1)
     else:
         return 0
 
     streak = 0
-    while cursor in days:
-        streak += 1
+    while cursor in days or cursor in skipped:
+        if cursor in days:
+            streak += 1
         cursor -= timedelta(days=1)
     return streak
 
@@ -72,7 +78,32 @@ def get_habit(db: Session, habit_id: int) -> Habit | None:
 def complete_habit(db: Session, habit: Habit, today: date) -> Habit:
     already_done = db.query(Completion).filter_by(habit_id=habit.id, day=today).first()
     if not already_done:
+        # Completing today always wins over an existing freeze on it --
+        # a real completion is strictly better than a rest day.
+        existing_skip = db.query(Skip).filter_by(habit_id=habit.id, day=today).first()
+        if existing_skip:
+            db.delete(existing_skip)
         db.add(Completion(habit_id=habit.id, day=today))
+        db.commit()
+    return habit
+
+
+def skip_habit(db: Session, habit: Habit, today: date) -> Habit:
+    """Freeze today: preserves the streak without counting as a completion."""
+    already_done = db.query(Completion).filter_by(habit_id=habit.id, day=today).first()
+    if already_done:
+        raise ValueError("Habit is already completed today -- nothing to freeze.")
+    already_skipped = db.query(Skip).filter_by(habit_id=habit.id, day=today).first()
+    if not already_skipped:
+        db.add(Skip(habit_id=habit.id, day=today))
+        db.commit()
+    return habit
+
+
+def unskip_habit(db: Session, habit: Habit, today: date) -> Habit:
+    existing_skip = db.query(Skip).filter_by(habit_id=habit.id, day=today).first()
+    if existing_skip:
+        db.delete(existing_skip)
         db.commit()
     return habit
 
@@ -119,6 +150,7 @@ def get_stats(db: Session, today: date) -> dict:
     return {
         "total_habits": len(summaries),
         "completed_today": sum(1 for s in summaries if s["completed_today"]),
+        "skipped_today": sum(1 for s in summaries if s["skipped_today"]),
         "active_streaks": sum(1 for s in summaries if s["streak"] > 0),
         "best_streak": max((s["streak"] for s in summaries), default=0),
         "total_completions": sum(len(s["completed_days"]) for s in summaries),
@@ -152,6 +184,7 @@ def is_at_risk(
 
 def to_summary(habit: Habit, today: date) -> dict:
     completed_days = [c.day for c in habit.completions]
+    skipped_days = [s.day for s in habit.skips]
     completed_this_week = count_completions_in_week(completed_days, today)
     completed_today = today in completed_days
     return {
@@ -162,8 +195,10 @@ def to_summary(habit: Habit, today: date) -> dict:
         "notes": habit.notes,
         "archived": habit.archived,
         "completed_this_week": completed_this_week,
-        "streak": compute_streak(completed_days, today),
+        "streak": compute_streak(completed_days, today, skipped_days),
         "completed_today": completed_today,
         "completed_days": sorted(completed_days),
+        "skipped_today": today in skipped_days,
+        "skipped_days": sorted(skipped_days),
         "at_risk": is_at_risk(habit.target_per_week, completed_this_week, completed_today, today),
     }

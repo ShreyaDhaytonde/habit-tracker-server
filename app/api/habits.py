@@ -49,6 +49,29 @@ def complete_habit(habit_id: int, db: Session = Depends(get_db)):
     return habit_service.to_summary(habit, today)
 
 
+@router.post("/{habit_id}/skip", response_model=HabitOut)
+def skip_habit(habit_id: int, db: Session = Depends(get_db)):
+    habit = habit_service.get_habit(db, habit_id)
+    if habit is None:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    today = date.today()
+    try:
+        habit_service.skip_habit(db, habit, today)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return habit_service.to_summary(habit, today)
+
+
+@router.delete("/{habit_id}/skip", response_model=HabitOut)
+def unskip_habit(habit_id: int, db: Session = Depends(get_db)):
+    habit = habit_service.get_habit(db, habit_id)
+    if habit is None:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    today = date.today()
+    habit_service.unskip_habit(db, habit, today)
+    return habit_service.to_summary(habit, today)
+
+
 @router.patch("/{habit_id}", response_model=HabitOut)
 def update_habit(habit_id: int, payload: HabitUpdate, db: Session = Depends(get_db)):
     habit = habit_service.get_habit(db, habit_id)

@@ -36,6 +36,32 @@ def test_streak_zero_if_last_completion_older_than_yesterday():
     assert compute_streak(days, today) == 0
 
 
+def test_skipped_day_pauses_the_streak_without_breaking_it():
+    today = date(2026, 1, 10)
+    days = [today, today - timedelta(days=2)]  # yesterday missing
+    skipped = [today - timedelta(days=1)]  # yesterday frozen instead
+    assert compute_streak(days, today, skipped) == 2
+
+
+def test_skipped_day_does_not_itself_add_to_the_streak():
+    today = date(2026, 1, 10)
+    days = [today - timedelta(days=1)]
+    skipped = [today]  # today frozen, not completed
+    assert compute_streak(days, today, skipped) == 1
+
+
+def test_a_gap_still_breaks_the_streak_even_with_skips_elsewhere():
+    today = date(2026, 1, 10)
+    days = [today, today - timedelta(days=3)]
+    skipped = [today - timedelta(days=5)]  # too far back to bridge the gap
+    assert compute_streak(days, today, skipped) == 1
+
+
+def test_only_skips_with_no_completions_ever_is_zero_streak():
+    today = date(2026, 1, 10)
+    assert compute_streak([], today, [today, today - timedelta(days=1)]) == 0
+
+
 def test_start_of_week_returns_monday():
     # 2026-01-10 is a Saturday.
     assert start_of_week(date(2026, 1, 10)) == date(2026, 1, 5)

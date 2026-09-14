@@ -1,3 +1,6 @@
+from datetime import date
+
+
 def test_health(client):
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -133,6 +136,7 @@ def test_stats_empty_when_no_habits(client):
     assert resp.json() == {
         "total_habits": 0,
         "completed_today": 0,
+        "skipped_today": 0,
         "active_streaks": 0,
         "best_streak": 0,
         "total_completions": 0,
@@ -243,3 +247,69 @@ def test_at_risk_is_false_once_completed_today_even_for_a_daily_habit(client):
     created = client.post("/habits", json={"name": "Run", "target_per_week": 7}).json()
     resp = client.post(f"/habits/{created['id']}/complete")
     assert resp.json()["at_risk"] is False
+
+
+def test_skip_habit_marks_today_frozen(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    resp = client.post(f"/habits/{created['id']}/skip")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["skipped_today"] is True
+    assert body["completed_today"] is False
+
+
+def test_skip_habit_is_idempotent_same_day(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    client.post(f"/habits/{created['id']}/skip")
+    resp = client.post(f"/habits/{created['id']}/skip")
+    assert resp.status_code == 200
+    assert resp.json()["skipped_days"] == [str(date.today())]
+
+
+def test_skip_unknown_habit_404s(client):
+    resp = client.post("/habits/999/skip")
+    assert resp.status_code == 404
+
+
+def test_skip_already_completed_habit_conflicts(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    client.post(f"/habits/{created['id']}/complete")
+    resp = client.post(f"/habits/{created['id']}/skip")
+    assert resp.status_code == 409
+
+
+def test_completing_a_skipped_day_overrides_the_freeze(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    client.post(f"/habits/{created['id']}/skip")
+    resp = client.post(f"/habits/{created['id']}/complete")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["completed_today"] is True
+    assert body["skipped_today"] is False
+
+
+def test_unskip_habit_removes_the_freeze(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    client.post(f"/habits/{created['id']}/skip")
+    resp = client.delete(f"/habits/{created['id']}/skip")
+    assert resp.status_code == 200
+    assert resp.json()["skipped_today"] is False
+
+
+def test_unskip_habit_is_idempotent(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    resp = client.delete(f"/habits/{created['id']}/skip")
+    assert resp.status_code == 200
+    assert resp.json()["skipped_today"] is False
+
+
+def test_unskip_unknown_habit_404s(client):
+    resp = client.delete("/habits/999/skip")
+    assert resp.status_code == 404
+
+
+def test_stats_counts_skipped_today(client):
+    created = client.post("/habits", json={"name": "Run"}).json()
+    client.post(f"/habits/{created['id']}/skip")
+    body = client.get("/habits/stats").json()
+    assert body["skipped_today"] == 1

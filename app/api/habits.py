@@ -14,10 +14,13 @@ router = APIRouter(prefix="/habits", tags=["habits"])
 def list_habits(
     category: str | None = None,
     include_archived: bool = False,
+    priority: str | None = None,
     db: Session = Depends(get_db),
 ):
     today = date.today()
-    habits = habit_service.list_habits(db, category=category, include_archived=include_archived)
+    habits = habit_service.list_habits(
+        db, category=category, include_archived=include_archived, priority=priority
+    )
     return [habit_service.to_summary(h, today) for h in habits]
 
 
@@ -34,7 +37,12 @@ def get_stats(db: Session = Depends(get_db)):
 @router.post("", response_model=HabitOut, status_code=201)
 def create_habit(payload: HabitCreate, db: Session = Depends(get_db)):
     habit = habit_service.create_habit(
-        db, payload.name, payload.category, payload.target_per_week, payload.notes
+        db,
+        payload.name,
+        payload.category,
+        payload.target_per_week,
+        payload.notes,
+        payload.priority,
     )
     return habit_service.to_summary(habit, date.today())
 
@@ -85,6 +93,8 @@ def update_habit(habit_id: int, payload: HabitUpdate, db: Session = Depends(get_
         payload.target_per_week,
         payload.notes,
         payload.archived,
+        payload.priority,
+        payload.pinned,
     )
     return habit_service.to_summary(habit, date.today())
 

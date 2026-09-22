@@ -31,6 +31,33 @@ def compute_streak(
     return streak
 
 
+def compute_longest_streak(
+    completed_days: list[date], skipped_days: list[date] | None = None
+) -> int:
+    """Longest run of consecutive completed days ever, not just the current
+    run ending today/yesterday that compute_streak tracks. A skipped/frozen
+    day bridges a run exactly like it does for the current streak -- it
+    neither extends nor breaks it, consistent with compute_streak's own
+    treatment of skips."""
+    days = set(completed_days)
+    skipped = set(skipped_days or ())
+    if not days:
+        return 0
+
+    all_days = sorted(days | skipped)
+    longest = 0
+    current = 0
+    prev_day: date | None = None
+    for day in all_days:
+        if prev_day is not None and (day - prev_day).days > 1:
+            current = 0
+        if day in days:
+            current += 1
+            longest = max(longest, current)
+        prev_day = day
+    return longest
+
+
 def start_of_week(day: date) -> date:
     """Monday of the week containing `day`."""
     return day - timedelta(days=day.weekday())
@@ -47,8 +74,15 @@ def create_habit(
     category: str = "General",
     target_per_week: int = 7,
     notes: str | None = None,
+    priority: str = "Medium",
 ) -> Habit:
-    habit = Habit(name=name, category=category, target_per_week=target_per_week, notes=notes)
+    habit = Habit(
+        name=name,
+        category=category,
+        target_per_week=target_per_week,
+        notes=notes,
+        priority=priority,
+    )
     db.add(habit)
     db.commit()
     db.refresh(habit)
@@ -56,11 +90,16 @@ def create_habit(
 
 
 def list_habits(
-    db: Session, category: str | None = None, include_archived: bool = False
+    db: Session,
+    category: str | None = None,
+    include_archived: bool = False,
+    priority: str | None = None,
 ) -> list[Habit]:
     query = db.query(Habit)
     if category:
         query = query.filter(Habit.category == category)
+    if priority:
+        query = query.filter(Habit.priority == priority)
     if not include_archived:
         query = query.filter(Habit.archived.is_(False))
     return query.order_by(Habit.id).all()
@@ -116,6 +155,8 @@ def update_habit(
     target_per_week: int | None = None,
     notes: str | None = None,
     archived: bool | None = None,
+    priority: str | None = None,
+    pinned: bool | None = None,
 ) -> Habit:
     if name is not None:
         habit.name = name
@@ -127,6 +168,10 @@ def update_habit(
         habit.notes = notes
     if archived is not None:
         habit.archived = archived
+    if priority is not None:
+        habit.priority = priority
+    if pinned is not None:
+        habit.pinned = pinned
     db.commit()
     db.refresh(habit)
     return habit
@@ -144,8 +189,10 @@ def get_stats(db: Session, today: date) -> dict:
     weekly_completed_total = sum(s["completed_this_week"] for s in summaries)
 
     by_category: dict[str, int] = {}
+    by_priority: dict[str, int] = {}
     for summary in summaries:
         by_category[summary["category"]] = by_category.get(summary["category"], 0) + 1
+        by_priority[summary["priority"]] = by_priority.get(summary["priority"], 0) + 1
 
     return {
         "total_habits": len(summaries),
@@ -159,7 +206,9 @@ def get_stats(db: Session, today: date) -> dict:
             if weekly_target_total
             else 0
         ),
+        "pinned_count": sum(1 for s in summaries if s["pinned"]),
         "by_category": by_category,
+        "by_priority": by_priority,
     }
 
 
@@ -191,11 +240,14 @@ def to_summary(habit: Habit, today: date) -> dict:
         "id": habit.id,
         "name": habit.name,
         "category": habit.category,
+        "priority": habit.priority,
         "target_per_week": habit.target_per_week,
         "notes": habit.notes,
         "archived": habit.archived,
+        "pinned": habit.pinned,
         "completed_this_week": completed_this_week,
         "streak": compute_streak(completed_days, today, skipped_days),
+        "longest_streak": compute_longest_streak(completed_days, skipped_days),
         "completed_today": completed_today,
         "completed_days": sorted(completed_days),
         "skipped_today": today in skipped_days,

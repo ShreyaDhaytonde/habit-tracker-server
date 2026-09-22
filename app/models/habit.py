@@ -12,9 +12,11 @@ class Habit(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     category: Mapped[str] = mapped_column(String(50), default="General", server_default="General")
+    priority: Mapped[str] = mapped_column(String(10), default="Medium", server_default="Medium")
     target_per_week: Mapped[int] = mapped_column(Integer, default=7, server_default="7")
     notes: Mapped[str | None] = mapped_column(String(1000), default=None, nullable=True)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     completions: Mapped[list["Completion"]] = relationship(
         back_populates="habit", cascade="all, delete-orphan", order_by="Completion.day"

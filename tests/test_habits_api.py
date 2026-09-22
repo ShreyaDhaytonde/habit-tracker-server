@@ -141,7 +141,9 @@ def test_stats_empty_when_no_habits(client):
         "best_streak": 0,
         "total_completions": 0,
         "weekly_completion_rate": 0,
+        "pinned_count": 0,
         "by_category": {},
+        "by_priority": {},
     }
 
 
